@@ -79,6 +79,7 @@ import tkinter.ttk as ttk
 from tkinter import filedialog
 import pylab as pl
 import os.path
+from scipy.interpolate import CubicSpline, PchipInterpolator, Akima1DInterpolator
 
 # from tkinter import ttk
 
@@ -105,6 +106,16 @@ class MyEntry(tk.Entry):
 class Application(tk.Tk):
     name = basename(splitext(basename(__file__.capitalize()))[0])
     name = "Foo"
+    colors = [
+        "black",
+        "red",
+        "blue",
+        "green",
+        "magenta",
+        "purple",
+        "coral",
+        "darkgreen",
+    ]
 
     def __init__(self):
         super().__init__(className=self.name)
@@ -141,30 +152,55 @@ class Application(tk.Tk):
 
         tk.Label(self.grafFrame, text="Titulek").grid(row=0, column=0)
         self.titleEntry = MyEntry(self.grafFrame)
-        self.titleEntry.grid(row=0, column=1, sticky=tk.EW)
+        self.titleEntry.grid(row=0, column=1, sticky=tk.EW, columnspan=3)
         tk.Label(self.grafFrame, text="osa X").grid(row=1, column=0)
         self.xEntry = MyEntry(self.grafFrame)
-        self.xEntry.grid(row=1, column=1, columnspan=2, sticky=tk.EW)
+        self.xEntry.grid(row=1, column=1, columnspan=3, sticky=tk.EW)
         tk.Label(self.grafFrame, text="osa Y").grid(row=2, column=0)
         self.yEntry = MyEntry(self.grafFrame)
-        self.yEntry.grid(row=2, column=1, sticky=tk.EW)
+        self.yEntry.grid(row=2, column=1, sticky=tk.EW, columnspan=3)
 
         tk.Label(self.grafFrame, text="mřížka").grid(row=3, column=0)
         self.gridVar = tk.BooleanVar(value=True)
         self.gridCheck = tk.Checkbutton(self.grafFrame, variable=self.gridVar)
         self.gridCheck.grid(row=3, column=1, sticky="w")
 
-        self.lineVar = tk.StringVar(value="none")
         tk.Label(self.grafFrame, text="čára").grid(row=4, column=0)
-        tk.OptionMenu(self.grafFrame, self.lineVar, "none", "-", "--", "-.", ":").grid(
+        self.lineVar = tk.StringVar(value="None")
+        tk.OptionMenu(self.grafFrame, self.lineVar, "None", "-", "--", "-.", ":").grid(
             row=4, column=1, sticky="w"
         )
+        self.colorVar = tk.StringVar(value="black")
+        tk.OptionMenu(self.grafFrame, self.colorVar, *self.colors).grid(
+            row=4, column=2, sticky="w"
+        )
 
-        self.markerVar = tk.StringVar(value="none")
+        self.markerVar = tk.StringVar(value="x")
         tk.Label(self.grafFrame, text="marker").grid(row=5, column=0)
         tk.OptionMenu(
-            self.grafFrame, self.markerVar, "none", *tuple("xX+P,.o*1234")
+            self.grafFrame, self.markerVar, "None", *tuple("xX+P,.o*1234D")
         ).grid(row=5, column=1, sticky="w")
+        self.mcolorVar = tk.StringVar(value="black")
+        tk.OptionMenu(self.grafFrame, self.mcolorVar, *self.colors).grid(
+            row=5, column=2, sticky="w"
+        )
+
+        self.interpolVar = tk.StringVar(value="None")
+        tk.Label(self.grafFrame, text="interpolace").grid(row=6, column=0)
+        tk.OptionMenu(
+            self.grafFrame,
+            self.interpolVar,
+            "None",
+            "CubicSpline",
+            "Akima1DInterpolator",
+            "PchipInterpolator",
+        ).grid(row=6, column=1, sticky="w")
+        self.icolorVar = tk.StringVar(value="black")
+        tk.OptionMenu(
+            self.grafFrame,
+            self.icolorVar,
+            *self.colors,
+        ).grid(row=6, column=2, sticky="w")
 
         tk.Button(self, text="Vykreslit", command=self.plot).pack(anchor="w")
 
@@ -172,6 +208,7 @@ class Application(tk.Tk):
 
     def selectFile(self):
         self.fileEntry.value = filedialog.askopenfilename()
+        self.fileEntry.xview_moveto(1)
 
     def plot(self):
         if not os.path.isfile(self.fileEntry.value):
@@ -195,7 +232,33 @@ class Application(tk.Tk):
                     x.append(float(x1.replace(",", ".")))
                     y.append(float(y1.replace(",", ".")))
 
-        pl.plot(x, y, linestyle=self.lineVar.get(), marker=self.markerVar.get())
+        bagr = {}
+        bagr["linestyle"] = self.lineVar.get()
+        bagr["marker"] = self.markerVar.get()
+
+        pl.plot(
+            x,
+            y,
+            linestyle=self.lineVar.get(),
+            marker=self.markerVar.get(),
+            color=self.colorVar.get(),
+            markerfacecolor=self.mcolorVar.get(),
+            markeredgecolor=self.mcolorVar.get(),
+        )
+
+        interpolace = {}
+        interpolace["CubicSpline"] = CubicSpline
+        interpolace["PchipInterpolator"] = PchipInterpolator
+        interpolace["Akima1DInterpolator"] = Akima1DInterpolator
+
+        if self.interpolVar.get() in interpolace:
+            min_x = min(x)
+            max_x = max(x)
+            spl = interpolace[self.interpolVar.get()](x, y)
+            new_x = pl.linspace(min_x, max_x, 777)
+            new_y = spl(new_x)
+            pl.plot(new_x, new_y, color=self.icolorVar.get())
+
         pl.title(self.titleEntry.value)
         pl.xlabel(self.xEntry.value)
         pl.ylabel(self.yEntry.value)
